@@ -15,6 +15,9 @@ from src.Params import Params
 from src.Pheromone import AlarmPheromone, RecruitPheromone
 
 
+# TODO: optimise using bitmap mask for obstacles, and 2D numpy array for pheromones: type and activity level/duration
+
+
 class Model:
     def __init__(self):
         self.observers = []
@@ -208,8 +211,8 @@ class Model:
                             dest_found = True
                             break
                 if not dest_found and not agent.is_ignoring_pheromones():
-                    match_pheromone_types = self.find_pheromones(agent)
-                    for pheromone in self.pheromones[:]:
+                    match_pheromone_types = self.find_pheromones(agent)     # optimise
+                    for pheromone in self.pheromones:                       # optimise
                         if not match_pheromone_types or type(pheromone) in match_pheromone_types:
                             distance = pheromone.calc_distance(position)
                             if distance < pheromone.max_detect_range:
@@ -256,30 +259,32 @@ class Model:
 
     def slow_update(self):
         if self.running:
-            for food in self.foods[:]:
+            for food in self.foods:
                 if food.current_amount <= 0:
                     self.foods.remove(food)
-            for pheromone in self.pheromones[:]:
+            for pheromone in self.pheromones:
                 pheromone.update(self.params.time_speed)
                 if not pheromone.active:
                     self.pheromones.remove(pheromone)
 
-    def find_pheromones(self, ant):
+    def find_pheromones(self, agent):
+        # optimise
         match_pheromone_types = []
         for pheromone in self.pheromones:
-            distance = pheromone.calc_distance(ant.position)
+            distance = pheromone.calc_distance(agent.position)
             if distance < pheromone.max_detect_range:
                 if isinstance(pheromone, AlarmPheromone) and AlarmPheromone not in match_pheromone_types:
                     match_pheromone_types.clear()
                     match_pheromone_types.append(AlarmPheromone)
-                    ant.set_mode(AgentMode.following_alarm)
-                elif isinstance(pheromone, RecruitPheromone) and not match_pheromone_types and not ant.is_returning():
+                    agent.set_mode(AgentMode.following_alarm)
+                elif isinstance(pheromone, RecruitPheromone) and not match_pheromone_types and not agent.is_returning():
                     match_pheromone_types.append(RecruitPheromone)
-                    ant.set_mode(AgentMode.following_pheromone)
+                    agent.set_mode(AgentMode.following_pheromone)
         return match_pheromone_types
 
     def check_destination(self, position, destination):
         for obstacle in self.obstacles:
+            # optimise
             if obstacle.intersects(position):
                 if obstacle.get_side(position) != obstacle.get_side(destination):
                     return False
