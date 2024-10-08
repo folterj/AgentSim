@@ -1,6 +1,7 @@
 class Constants:
     world_size = 250.0 / 1000  # 25 cm (250 mm)
     update_time = 0.1  # (0.1 s)
+    slow_update_interval = 10
     spawn_time = 1  # (1 s)
     refresh_time = 0.1  # (10 Hz)
 

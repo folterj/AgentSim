@@ -1,6 +1,3 @@
-from qtpy.QtCore import QTimer
-
-from src.Constants import Constants
 from src.Params import Params
 from src.View import View
 
@@ -11,13 +8,6 @@ class Controller:
         self.model = model
         self.view = View(self, model, self.params)
         self.view.create()
-
-        self.refresh_view_timer = QTimer()
-        self.refresh_view_timer.timeout.connect(self.refresh_view)
-        self.refresh_view_timer.start(int(Constants.refresh_time * 1000))
-
-    def close(self):
-        self.refresh_view_timer.stop()
 
     def start(self):
         self.model.start()
@@ -47,10 +37,6 @@ class Controller:
             self.view.zoom(2 * delta, position)
         elif delta > 0:
             self.view.zoom(0.5 / delta, position)
-
-    def refresh_view(self):
-        # triggered by refresh timer
-        self.view.draw()
 
     def update_view_size(self, new_size):
         self.view.update_size(new_size)

@@ -23,7 +23,6 @@ class View:
 
         self.updating = False
 
-        self.stopwatch = time.time()
         self.update_time = 0
 
         model.register_observer(self)
@@ -71,10 +70,10 @@ class View:
             self.draw_foods()
             self.draw_agents()
 
-            self.update_time = (time.time() - self.stopwatch) * 1000
+            self.update_time = time.time() - self.stopwatch
 
-            self.draw_text(f"model: {self.model.update_time:.3f} ms", (0, 25))
-            self.draw_text(f"view: {self.update_time:.3f} ms", (0, 50))
+            self.draw_text(f"model: {self.model.update_time * 1000:.0f} ms", (0, 25))
+            self.draw_text(f"view: {self.update_time * 1000:.0f} ms", (0, 50))
 
             self.image_window.draw(self.canvas)
 
@@ -84,6 +83,8 @@ class View:
         self.screen_size = new_size
         self.update()
 
+    # this function is called by the model to update observer
+    # remove QTimer in view/controller, and handle calling Qt function from here
     def update(self):
         viewsize = np.linalg.norm(self.view_size)
         screensize = np.linalg.norm(self.screen_size)

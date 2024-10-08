@@ -3,7 +3,7 @@ import math
 import numpy as np
 import random
 import time
-from threading import Timer
+from qtpy.QtCore import QTimer
 
 from src.Agent import Agent
 from src.AgentMode import AgentMode
@@ -24,9 +24,11 @@ class Model:
         self.foods = []
         self.obstacles = []
         self.params = Params()
-        self.spawn_timer = Timer(Constants.spawn_time, self.spawn)
-        self.update_timer = Timer(Constants.refresh_time, self.update)
-        self.slow_update_timer = Timer(Constants.refresh_time, self.slow_update)
+        self.spawn_timer = QTimer()
+        self.spawn_timer.timeout.connect(self.spawn)
+        self.update_timer = QTimer()
+        self.update_timer.timeout.connect(self.update)
+        self.update_timers()
         self.update_time = 0
         self.running = False
         self.update_running = False
@@ -35,9 +37,8 @@ class Model:
         self.update_timers()
 
     def stop_timers(self):
-        self.spawn_timer.cancel()
-        self.update_timer.cancel()
-        self.slow_update_timer.cancel()
+        self.spawn_timer.stop()
+        self.update_timer.stop()
 
     def reset(self):
         self.agents.clear()
@@ -45,37 +46,24 @@ class Model:
         self.foods.clear()
         self.obstacles.clear()
         self.create_maze_map()
+        self.slow_interval = 0
 
     def start(self):
         self.running = True
-        self.stop_timers()
-        self.spawn_timer_start()
-        self.update_timer_start()
-        self.slow_update_timer_start()
+        self.spawn_timer.start()
+        self.update_timer.start()
 
     def stop(self):
         self.running = False
-        self.spawn_timer.cancel()
-
-    def spawn_timer_start(self):
-        self.spawn_timer = Timer(self.spawn_time, self.spawn)
-        self.spawn_timer.start()
-
-    def update_timer_start(self):
-        self.update_timer = Timer(self.update_time, self.update)
-        self.update_timer.start()
-
-    def slow_update_timer_start(self):
-        self.slow_update_timer = Timer(Constants.refresh_time, self.slow_update)
-        self.slow_update_timer.start()
+        self.stop_timers()
 
     def update_params(self, params):
         self.params.copy_from(params)
         self.update_timers()
 
     def update_timers(self):
-        self.update_time = Constants.update_time / self.params.time_acceleration
-        self.spawn_time = Constants.spawn_time / self.params.time_acceleration
+        self.spawn_timer.setInterval(int(Constants.spawn_time / self.params.time_speed * 1000))
+        self.update_timer.setInterval(int(Constants.update_time / self.params.time_speed * 1000))
 
     def create_simple_map(self):
         self.hive = DObject((0.5 * self.params.world_size[0], 0.25 * self.params.world_size[1]))
@@ -165,7 +153,6 @@ class Model:
             last_point = point
 
     def spawn(self):
-        self.spawn_timer_start()
         if len(self.agents) < Constants.max_agents:
             position = self.hive.position
             pheromone_direction = (0, 0)
@@ -191,7 +178,6 @@ class Model:
             self.agents.append(agent)
 
     def update(self):
-        self.update_timer_start()
         if self.running and not self.update_running:
             self.update_running = True
             start_time = time.time()
@@ -260,18 +246,21 @@ class Model:
                 new_pheromone = agent.update(pheromone_direction)
                 if new_pheromone:
                     self.pheromones.append(new_pheromone)
+            if self.slow_interval >= Constants.slow_update_interval:
+                self.slow_update()
+                self.slow_interval = 0
+            self.slow_interval += 1
             self.update_time = time.time() - start_time
-            self.update_observers()
             self.update_running = False
+            self.update_observers()
 
     def slow_update(self):
-        self.slow_update_timer_start()
         if self.running:
             for food in self.foods[:]:
                 if food.current_amount <= 0:
                     self.foods.remove(food)
             for pheromone in self.pheromones[:]:
-                pheromone.update(self.params.time_acceleration)
+                pheromone.update(self.params.time_speed)
                 if not pheromone.active:
                     self.pheromones.remove(pheromone)
 
