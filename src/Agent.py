@@ -5,11 +5,11 @@ import random
 from src.AgentMode import AgentMode
 from src.Constants import Constants
 from src.DObject import DObject
-from src.Pheromone import RecruitPheromone, AlarmPheromone, TrailPheromone
+from src.Pheromone import Pheromone
 
 
 class Agent(DObject):
-    def __init__(self, position=(0, 0)):
+    def __init__(self, position):
         super().__init__(position)
         self.angle = 0
         self.direction = np.array([0, 0])
@@ -21,7 +21,6 @@ class Agent(DObject):
         self.ignore_pheromone_steps = 0
         self.mode = AgentMode.idle
         self.position = np.array(position)
-        self.rnd = random.Random()
         self.init()
 
     def init(self):
@@ -58,15 +57,12 @@ class Agent(DObject):
             self.speed = 0
         elif mode == AgentMode.exploring:
             self.speed = Constants.norm_speed
-            self.angle = self.rnd.random() * 2 * math.pi
+            self.angle = random.random() * 2 * math.pi
             self.update_direction()
         elif mode in [AgentMode.distressed, AgentMode.following_alarm]:
             self.speed = Constants.alarm_speed
         elif mode == AgentMode.returning_food:
             self.speed = Constants.norm_speed
-
-    def is_returning(self):
-        return self.mode in [AgentMode.returning_food, AgentMode.returning_tired]
 
     def update(self, pheromone_direction):
         new_pheromone = None
@@ -100,7 +96,7 @@ class Agent(DObject):
                     else:
                         self.vary_direction(1 / 6)
                     self.distance_last_pheromone = 0
-                    new_pheromone = TrailPheromone(self.position)
+                    new_pheromone = Pheromone(self.position, Constants.pheromones['trail'])
                     return_pheromone = True
 
         elif self.mode == AgentMode.following_pheromone:
@@ -112,7 +108,7 @@ class Agent(DObject):
             self.distance_last_pheromone += distance_moved
             if self.distance_last_pheromone > Constants.trail_create_distance and not self.is_ignoring_pheromones():
                 self.distance_last_pheromone = 0
-                new_pheromone = TrailPheromone(self.position)
+                new_pheromone = Pheromone(self.position, Constants.pheromones['trail'])
                 return_pheromone = True
 
         elif self.mode in [AgentMode.returning_food, AgentMode.returning_tired]:
@@ -125,13 +121,13 @@ class Agent(DObject):
                 self.distance_last_pheromone += distance_moved
                 if self.distance_last_pheromone > Constants.trail_create_distance:
                     self.distance_last_pheromone = 0
-                    new_pheromone = RecruitPheromone(self.position)
+                    new_pheromone = Pheromone(self.position, Constants.pheromones['recruit'])
                     return_pheromone = True
             self.steps_from_nest -= 1
 
         elif self.mode == AgentMode.distressed:
             self.distance_last_pheromone = 0
-            new_pheromone = AlarmPheromone(self.position)
+            new_pheromone = Pheromone(self.position, Constants.pheromones['alarm'])
             return_pheromone = True
 
         if return_pheromone:
@@ -154,7 +150,7 @@ class Agent(DObject):
         self.angle = math.atan2(self.direction[1], self.direction[0])
 
     def vary_direction(self, radvar):
-        self.angle += (self.rnd.random() - 0.5) * math.pi * (radvar * 2)
+        self.angle += (random.random() - 0.5) * math.pi * (radvar * 2)
         self.update_direction()
 
     def turn_around(self):

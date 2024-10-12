@@ -118,9 +118,9 @@ class View:
         cv.circle(self.canvas, position, rad, color, cv.FILLED, cv.LINE_AA)
 
     def draw_boundaries(self, color=(0, 0, 0)):
-        for obstacle in self.model.obstacles:
-            start = ((np.array(obstacle.start) - self.view_offset) * self.scale).astype(int)
-            end = ((np.array(obstacle.end) - self.view_offset) * self.scale).astype(int)
+        for boundary in self.model.boundaries:
+            start = ((np.array(boundary.start) - self.view_offset) * self.scale).astype(int)
+            end = ((np.array(boundary.end) - self.view_offset) * self.scale).astype(int)
             cv.line(self.canvas, start, end, color, 1, cv.LINE_AA)
 
     def draw_text(self, text, position, color=(0, 0, 0)):

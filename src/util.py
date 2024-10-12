@@ -1,4 +1,15 @@
+import numpy as np
 from qtpy.QtGui import QPixmap, QImage
+
+from src.Constants import Constants
+
+
+def world_to_map(position, map_size=Constants.map_size):
+    return tuple(np.round(position * map_size).astype(int).tolist())
+
+
+def map_to_world(map_position, map_size=Constants.map_size):
+    return np.asarray(map_position) / map_size
 
 
 def image_to_QPixmap(image):
