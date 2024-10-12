@@ -22,16 +22,18 @@ class Model:
     def __init__(self):
         self.observers = []
         self.hive = None
-        self.agents = []
+        self.agents = {}
+        self.next_agent_id = 0
         self.pheromones = []
+        self.pheromone_map = []
+        self.volatile_map = []
         self.foods = []
         self.obstacles = []
         self.params = Params()
-        self.spawn_timer = QTimer()
-        self.spawn_timer.timeout.connect(self.spawn)
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update)
         self.update_timers()
+        self.update_count = 0
         self.update_time = 0
         self.running = False
         self.update_running = False
@@ -39,33 +41,26 @@ class Model:
         self.reset()
         self.update_timers()
 
-    def stop_timers(self):
-        self.spawn_timer.stop()
-        self.update_timer.stop()
-
     def reset(self):
         self.agents.clear()
         self.pheromones.clear()
         self.foods.clear()
         self.obstacles.clear()
         self.create_maze_map()
-        self.slow_interval = 0
 
     def start(self):
         self.running = True
-        self.spawn_timer.start()
         self.update_timer.start()
 
     def stop(self):
         self.running = False
-        self.stop_timers()
+        self.update_timer.stop()
 
     def update_params(self, params):
         self.params.copy_from(params)
         self.update_timers()
 
     def update_timers(self):
-        self.spawn_timer.setInterval(int(Constants.spawn_time / self.params.time_speed * 1000))
         self.update_timer.setInterval(int(Constants.update_time / self.params.time_speed * 1000))
 
     def create_simple_map(self):
@@ -178,13 +173,17 @@ class Model:
                 agent.update_angle()
             else:
                 agent.set_mode(AgentMode.exploring)
-            self.agents.append(agent)
+            self.agents[self.next_agent_id] = agent
+            self.next_agent_id += 1
 
     def update(self):
         if self.running and not self.update_running:
             self.update_running = True
             start_time = time.time()
-            for agent in self.agents:
+            if self.update_count > Constants.spawn_time / Constants.update_time:
+                self.spawn()
+                self.update_count = 0
+            for agent in self.agents.values():
                 position = agent.position
                 pheromone_direction = (0, 0)
                 total_weight = 0
@@ -193,7 +192,7 @@ class Model:
                     distance = self.hive.calc_distance(agent.position)
                     if distance < self.hive.detect_range:
                         if distance <= agent.get_move_distance():
-                            self.agents.remove(agent)
+                            self.agents.pop(agent)
                             continue
                         agent.angle = self.calc_angle(agent.position, self.hive.position)
                         agent.update_direction()
@@ -249,23 +248,19 @@ class Model:
                 new_pheromone = agent.update(pheromone_direction)
                 if new_pheromone:
                     self.pheromones.append(new_pheromone)
-            if self.slow_interval >= Constants.slow_update_interval:
-                self.slow_update()
-                self.slow_interval = 0
-            self.slow_interval += 1
-            self.update_time = time.time() - start_time
-            self.update_running = False
-            self.update_observers()
 
-    def slow_update(self):
-        if self.running:
             for food in self.foods:
                 if food.current_amount <= 0:
                     self.foods.remove(food)
             for pheromone in self.pheromones:
-                pheromone.update(self.params.time_speed)
+                pheromone.update(Constants.update_time)
                 if not pheromone.active:
                     self.pheromones.remove(pheromone)
+
+            self.update_count += 1
+            self.update_time = time.time() - start_time
+            self.update_running = False
+            self.update_observers()
 
     def find_pheromones(self, agent):
         # optimise

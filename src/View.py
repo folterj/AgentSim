@@ -94,7 +94,7 @@ class View:
 
     def draw_agents(self, color=(0, 0, 0)):
         rad = max(int(Constants.agent_size / 2 * self.scale), 1)
-        for agent in self.model.agents:
+        for agent_id, agent in self.model.agents.items():
             position = ((np.array(agent.position) - self.view_offset) * self.scale).astype(int)
             cv.circle(self.canvas, position, rad, color, cv.FILLED, cv.LINE_AA)
 

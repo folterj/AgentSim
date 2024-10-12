@@ -36,8 +36,8 @@ class TrailPheromone(Pheromone):
         super().__init__(position)
 
     def set_values(self):
-        self.decay_time = 10 * 60 * 60  # (48 / 5 = 10 hours)
-        self.max_detect_range = 10.0 / 1000  # (1 cm)
+        self.decay_time = 10 * 60 * 60  # (48 / 5 = 10 hours in [s])
+        self.max_detect_range = 10 / 1000  # (1 cm in [m])
 
 
 class RecruitPheromone(Pheromone):
@@ -45,8 +45,8 @@ class RecruitPheromone(Pheromone):
         super().__init__(position)
 
     def set_values(self):
-        self.decay_time = 4 * 60  # (20 / 5 = 4 min)
-        self.max_detect_range = 10.0 / 1000  # (1 cm)
+        self.decay_time = 4 * 60  # (20 / 5 = 4 min in [s])
+        self.max_detect_range = 10 / 1000  # (1 cm in [m])
 
 
 class AlarmPheromone(Pheromone):
@@ -54,5 +54,5 @@ class AlarmPheromone(Pheromone):
         super().__init__(position)
 
     def set_values(self):
-        self.decay_time = 1 * 60  # (1 min)
-        self.max_detect_range = 100.0 / 1000  # (10 cm)
+        self.decay_time = 1 * 60  # (1 min in [s])
+        self.max_detect_range = 100 / 1000  # (10 cm in [m])
