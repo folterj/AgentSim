@@ -9,7 +9,7 @@ class Boundary:
 		self.length = 0
 		self.length2 = 0
 		self.horizontal = False
-		self.angle = 0.0
+		self.angle = 0
 
 		self.update()
 
@@ -26,7 +26,7 @@ class Boundary:
 
 		self.horizontal = (abs(self.end[0] - self.start[0]) > abs(self.end[1] - self.start[1]))
 
-		self.angle = math.atan2(self.end[1] - self.start[1], self.end[0] - self.start[0])
+		self.angle = math.degrees(math.atan2(self.end[1] - self.start[1], self.end[0] - self.start[0]))
 
 	def update(self):
 		self.dx = self.end[0] - self.start[0]

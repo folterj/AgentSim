@@ -1,7 +1,33 @@
+import math
 import numpy as np
 from qtpy.QtGui import QPixmap, QImage
 
 from src.Constants import Constants
+
+
+def calc_angle(origin, target):
+    delta = target - origin
+    return math.degrees(math.atan2(delta[1], delta[0]))
+
+
+def smallest_angle_dif(angle1, angle2):
+    difangle = abs(angle1 - angle2) % 360
+    if difangle > 180:
+        difangle = 360 - difangle
+    return difangle
+
+
+def norm_angle(angle):
+    if angle > 180:
+        return angle - 360
+    return angle
+
+
+def norm_direction(direction):
+    length = np.linalg.norm(direction)
+    if length != 1 and length != 0:
+        direction /= length
+    return direction
 
 
 def world_to_map(position, map_size=Constants.map_size):

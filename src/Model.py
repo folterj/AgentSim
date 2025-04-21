@@ -13,7 +13,7 @@ from src.DObject import DObject
 from src.Food import Food
 from src.Params import Params
 from src.Pheromone import Pheromone
-from src.util import world_to_map
+from src.util import *
 
 
 # TODO: optimise using bitmap mask for boundaries, and 2D numpy array for pheromones: type and activity level/duration
@@ -26,7 +26,7 @@ class Model:
         self.agents = {}
         self.next_agent_id = 0
         self.pheromones = []
-        self.pheromone_map = np.empty((Constants.map_size, Constants.map_size), dtype=Pheromone)
+        self.pheromone_maps = {}
         self.foods = []
         self.boundaries = []
         self.params = Params()
@@ -46,6 +46,8 @@ class Model:
         self.foods.clear()
         self.boundaries.clear()
         self.create_maze_map()
+        for label, values in Constants.pheromones.items():
+            self.pheromone_maps[label] = np.zeros((Constants.map_size, Constants.map_size), dtype=np.float32)
 
     def start(self):
         self.running = True
@@ -153,7 +155,7 @@ class Model:
         if len(self.agents) < Constants.max_agents:
             position = self.hive.position
             agent = Agent(position)
-            agent.set_mode(AgentMode.exploring)
+            agent.set_mode(AgentMode.Scout)
             self.agents[self.next_agent_id] = agent
             self.next_agent_id += 1
 
@@ -165,16 +167,16 @@ class Model:
                 self.spawn()
                 self.update_count = 0
             for agent in self.agents.values():
-                pheromone_direction = (0, 0)
+                new_direction = (0, 0)
                 dest_found = False
-                if agent.mode in [AgentMode.returning_food, AgentMode.returning_tired]:
+                if agent.mode in [AgentMode.Return, AgentMode.Recruit]:
                     # returning to hive
                     distance = self.hive.calc_distance(agent.position)
                     if distance < self.hive.detect_range:
                         if distance <= agent.get_move_distance():
                             self.agents.pop(agent)
                             continue
-                        agent.angle = self.calc_angle(agent.position, self.hive.position)
+                        agent.angle = calc_angle(agent.position, self.hive.position)
                         agent.update_direction()
                         dest_found = True
                 if agent.food_amount < 1:
@@ -186,26 +188,28 @@ class Model:
                                 agent.position = food.position
                                 food.eat_amount(agent)
                             else:
-                                agent.angle = self.calc_angle(agent.position, food.position)
+                                agent.angle = calc_angle(agent.position, food.position)
                                 agent.update_direction()
                             dest_found = True
                             break
                 if not dest_found and not agent.is_ignoring_pheromones():
-                    pheromone = self.find_pheromones(agent)
-                    if pheromone is not None:
-                        distance = pheromone.calc_distance(agent.position)
-                        if distance > 0:
-                            direction = (pheromone.position - agent.position) / distance
-                            pheromone_direction = self.norm_direction(pheromone_direction + direction)
+                    pheromones = self.find_pheromones_pos(agent)
+                    if pheromones:
+                        pheromone = agent.choose_pheromone(pheromones)
+                        if pheromone:
+                            distance = pheromone.calc_distance(agent.position)
+                            if distance > 0:
+                                direction = (pheromone.position - agent.position) / distance
+                                new_direction = norm_direction(new_direction + direction)
                 destination = agent.calc_destination()
                 for boundary in self.boundaries:
                     if boundary.intersects(agent.position):
                         if boundary.get_side(agent.position) != boundary.get_side(destination):
                             agent.ignore_pheromones()
                             angle1 = boundary.angle
-                            angle2 = 2 * math.pi - angle1
-                            dangle1 = self.smallest_angle_dif(agent.angle, angle1)
-                            dangle2 = self.smallest_angle_dif(agent.angle, angle2)
+                            angle2 = angle1 + 180
+                            dangle1 = smallest_angle_dif(agent.angle, angle1)
+                            dangle2 = smallest_angle_dif(agent.angle, angle2)
                             if abs(dangle1) < abs(dangle2):
                                 agent.angle = angle1
                             else:
@@ -214,9 +218,9 @@ class Model:
                             destination = agent.calc_destination()
                 while not self.check_destination(agent.position, destination):
                     agent.ignore_pheromones()
-                    agent.vary_direction(0.1)
+                    agent.vary_direction(10)
                     destination = agent.calc_destination()
-                new_pheromone = agent.update(pheromone_direction)
+                new_pheromone = agent.update(new_direction)
                 if new_pheromone is not None:
                     self.add_pheromone(new_pheromone)
 
@@ -224,7 +228,8 @@ class Model:
                 if food.current_amount <= 0:
                     self.foods.remove(food)
             for pheromone in self.pheromones:
-                pheromone.update(Constants.update_time)
+                map = self.pheromone_maps[pheromone.label]
+                pheromone.update(Constants.update_time, map)
                 if not pheromone.active:
                     self.pheromones.remove(pheromone)
 
@@ -235,20 +240,22 @@ class Model:
 
     def add_pheromone(self, pheromone):
         self.pheromones.append(pheromone)
-        position0 = pheromone.position
-        if pheromone.detect_range > 0:
-            detect_range = int(round(pheromone.detect_range))
-            for y in range(-detect_range, detect_range):
-                for x in range(-detect_range, detect_range):
-                    position = np.array(world_to_map(position0)) + [x, y]
-                    if 0 <= position[0] < self.pheromone_map[0] and 0 <= position[1] < self.pheromone_map[1]:
-                        self.pheromone_map[tuple(position)] = pheromone
-        else:
-            self.pheromone_map[world_to_map(position0)] = pheromone
+        pheromone.add_to_map(self.pheromone_maps[pheromone.label])
 
-    def find_pheromones(self, agent):
-        pheromone = self.pheromone_map[world_to_map(agent.position)]
-        return pheromone
+    def find_pheromones_pos(self, agent):
+        pheromones = []
+        for pheromone in self.pheromones:
+            if pheromone.calc_distance(agent.position) < pheromone.max_detect_range + 1 / Constants.map_size:
+                pheromones.append(pheromone)
+        return pheromones
+
+    def find_pheromones_map(self, agent):
+        pheromones = []
+        position = world_to_map(agent.position)
+        for label, map in self.pheromone_maps.items():
+            if map[tuple(np.flip(position))]:
+                pheromones.append(label)
+        return pheromones
 
     def check_destination(self, position, destination):
         for boundary in self.boundaries:
@@ -257,30 +264,6 @@ class Model:
                 if boundary.get_side(position) != boundary.get_side(destination):
                     return False
         return True
-
-    def calc_angle(self, origin, target):
-        delta = target - origin
-        return math.atan2(delta[1], delta[0])
-
-    def smallest_angle_dif(self, angle1, angle2):
-        difangle = abs(angle1 - angle2) % (2 * math.pi)
-        if difangle > math.pi:
-            difangle = 2 * math.pi - difangle
-        return difangle
-
-    def norm_angle(self, angle):
-        if angle > math.pi:
-            return angle - 2 * math.pi
-        return angle
-
-    def angle_to_detection(self, angle):
-        return 1 - angle / math.pi
-
-    def norm_direction(self, direction):
-        length = np.linalg.norm(direction)
-        if length != 1 and length != 0:
-            direction /= length
-        return direction
 
     def update_observers(self):
         for observer in self.observers:

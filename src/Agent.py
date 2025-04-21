@@ -6,6 +6,7 @@ from src.AgentMode import AgentMode
 from src.Constants import Constants
 from src.DObject import DObject
 from src.Pheromone import Pheromone
+from src.util import calc_angle, smallest_angle_dif
 
 
 class Agent(DObject):
@@ -19,13 +20,13 @@ class Agent(DObject):
         self.food_amount = 0
         self.steps_from_nest = 0
         self.ignore_pheromone_steps = 0
-        self.mode = AgentMode.idle
+        self.mode = AgentMode.Idle
         self.position = np.array(position)
         self.init()
 
     def init(self):
-        self.detect_range = 10 / 1000
-        self.mode = AgentMode.idle
+        self.detect_range = 0
+        self.mode = AgentMode.Idle
         self.distance_last_pheromone = 0
         self.energy = Constants.total_energy
         self.food_amount = 0
@@ -41,7 +42,7 @@ class Agent(DObject):
             new_direction = np.array(self.direction)
         destination = [0, 0]
 
-        if self.mode != AgentMode.idle and self.mode != AgentMode.dead:
+        if self.mode not in [AgentMode.Idle, AgentMode.Dead]:
             distance_moved = self.speed * Constants.update_time
             destination = self.position + (new_direction * distance_moved)
         return destination
@@ -49,94 +50,84 @@ class Agent(DObject):
     def set_mode(self, mode):
         self.mode = mode
 
-        if mode in [AgentMode.idle, AgentMode.dead]:
+        if mode in [AgentMode.Idle, AgentMode.Eat, AgentMode.Dead]:
             self.speed = 0
             self.angle = 0
             self.direction = np.array([0, 0])
-        elif mode == AgentMode.eating:
-            self.speed = 0
-        elif mode == AgentMode.exploring:
+        elif mode == AgentMode.Scout:
             self.speed = Constants.norm_speed
-            self.angle = random.random() * 2 * math.pi
+            self.angle = random.random() * 360
             self.update_direction()
-        elif mode in [AgentMode.distressed, AgentMode.following_alarm]:
-            self.speed = Constants.alarm_speed
-        elif mode == AgentMode.returning_food:
+        elif mode == AgentMode.Recruit:
             self.speed = Constants.norm_speed
+        elif mode in [AgentMode.Distress]:
+            self.speed = Constants.alarm_speed
 
-    def update(self, pheromone_direction):
+    def choose_pheromone(self, pheromones):
+        candidates = []
+        for pheromone in pheromones:
+            distance = self.calc_distance(pheromone.position)
+            if distance > 0:
+                angle = smallest_angle_dif(calc_angle(self.position, pheromone.position), self.angle)
+                if abs(angle) <= 60:
+                    candidates.append((distance, pheromone))
+        if candidates:
+            if len(candidates) == 1:
+                best_candidate = candidates[0]
+            else:
+                best_candidate = min(candidates, key=lambda candidate: candidate[0])
+            return best_candidate[1]
+        return None
+
+    def update(self, target_direction):
         new_pheromone = None
-        return_pheromone = False
         distance_moved = 0
-        pheromone_detected = (pheromone_direction[0] != 0 or pheromone_direction[1] != 0)
+        has_target = (target_direction[0] != 0 or target_direction[1] != 0)
 
-        if self.mode not in [AgentMode.idle, AgentMode.dead, AgentMode.eating]:
+        if self.mode not in [AgentMode.Idle, AgentMode.Dead, AgentMode.Eat]:
             distance_moved = self.get_move_distance()
             self.position += self.direction * distance_moved
             self.energy -= distance_moved
             if self.energy <= 0:
                 self.energy = 0
-                self.mode = AgentMode.dead
+                self.mode = AgentMode.Dead
                 self.speed = 0
             if self.ignore_pheromone_steps > 0:
                 self.ignore_pheromone_steps -= 1
 
-        if self.mode == AgentMode.exploring:
+        if self.mode == AgentMode.Scout:
             if self.energy < Constants.trail_energy:
                 self.turn_around()
-                self.mode = AgentMode.returning_tired
+                self.mode = AgentMode.Return
             else:
                 self.steps_from_nest += 1
                 self.distance_last_pheromone += distance_moved
                 if self.distance_last_pheromone > Constants.trail_create_distance and not self.is_ignoring_pheromones():
-                    if pheromone_detected:
-                        pheromone_angle = math.atan2(pheromone_direction[1], pheromone_direction[0])
-                        self.angle += (self.angle - pheromone_angle)
+                    if has_target:
+                        target_angle = math.degrees(math.atan2(target_direction[1], target_direction[0]))
+                        self.angle = target_angle
                         self.update_direction()
                     else:
-                        self.vary_direction(1 / 6)
+                        self.vary_direction(30)
                     self.distance_last_pheromone = 0
-                    new_pheromone = Pheromone(self.position, Constants.pheromones['trail'])
-                    return_pheromone = True
+                    new_pheromone = Pheromone('trail', self.position)
 
-        elif self.mode == AgentMode.following_pheromone:
-            if pheromone_detected:
-                self.direction = np.array(pheromone_direction)
+        elif self.mode == AgentMode.Distress:
+            self.distance_last_pheromone = 0
+            new_pheromone = Pheromone('alarm', self.position)
+
+        else:
+            if has_target:
+                self.direction = np.array(target_direction)
                 self.update_angle()
-            else:
-                self.mode = AgentMode.exploring
             self.distance_last_pheromone += distance_moved
             if self.distance_last_pheromone > Constants.trail_create_distance and not self.is_ignoring_pheromones():
                 self.distance_last_pheromone = 0
-                new_pheromone = Pheromone(self.position, Constants.pheromones['trail'])
-                return_pheromone = True
+                new_pheromone = Pheromone('trail', self.position)
 
-        elif self.mode in [AgentMode.returning_food, AgentMode.returning_tired]:
-            if pheromone_detected:
-                self.direction = np.array(pheromone_direction)
-                self.update_angle()
-            else:
-                self.vary_direction(1 / 3)
-            if self.mode == AgentMode.returning_food:
-                self.distance_last_pheromone += distance_moved
-                if self.distance_last_pheromone > Constants.trail_create_distance:
-                    self.distance_last_pheromone = 0
-                    new_pheromone = Pheromone(self.position, Constants.pheromones['recruit'])
-                    return_pheromone = True
-            self.steps_from_nest -= 1
-
-        elif self.mode == AgentMode.distressed:
-            self.distance_last_pheromone = 0
-            new_pheromone = Pheromone(self.position, Constants.pheromones['alarm'])
-            return_pheromone = True
-
-        if return_pheromone:
-            return new_pheromone
-        return None
+        return new_pheromone
 
     def ignore_pheromones(self):
-        if self.mode == AgentMode.following_pheromone:
-            self.mode = AgentMode.exploring
         self.ignore_pheromone_steps = 5
 
     def is_ignoring_pheromones(self):
@@ -144,22 +135,22 @@ class Agent(DObject):
 
     def update_direction(self):
         self.check_angle()
-        self.direction = np.array([math.cos(self.angle), math.sin(self.angle)])
+        self.direction = np.array([math.cos(math.radians(self.angle)), math.sin(math.radians(self.angle))])
 
     def update_angle(self):
         self.angle = math.atan2(self.direction[1], self.direction[0])
 
-    def vary_direction(self, radvar):
-        self.angle += (random.random() - 0.5) * math.pi * (radvar * 2)
+    def vary_direction(self, angle_variation):
+        self.angle += (random.random() - 0.5) * 2 * angle_variation
         self.update_direction()
 
     def turn_around(self):
         self.direction = -self.direction
-        self.angle += math.pi
+        self.angle += 180
         self.check_angle()
 
     def check_angle(self):
-        while self.angle < -2 * math.pi:
-            self.angle += 2 * math.pi
-        while self.angle > 2 * math.pi:
-            self.angle -= 2 * math.pi
+        while self.angle < -360:
+            self.angle += 360
+        while self.angle > 360:
+            self.angle -= 360

@@ -19,24 +19,24 @@ class Constants:
     recruit_create_distance = 0  # (continuous)
 
     pheromones = {
-        'trail': {
-            'decay_time': 48 / 5 * 60 * 60, # (48 hours in [s])
-            'max_detect_range': 0,
-            'action': 'attract',
-        },
-        'recruit': {
-            'decay_time': 33 / 5 * 60,      # (33 mins in [s])
-            'max_detect_range': 150 / 1e3,  # (15 cm in [m])
-            'action': 'attract',
+        'alarm': {
+            'decay_time': 10 / 5 * 60,      # (10 min in [s])
+            'max_detect_range': 300 / 1e3,  # (30 cm in [m])
+            'action': 'alarm',
         },
         'repel': {
             'decay_time': 78 / 5 * 60,      # (78 min in [s])
             'max_detect_range': 300 / 1e3,  # (30 cm in [m])
             'action': 'repel',
         },
-        'alarm': {
-            'decay_time': 10 / 5 * 60,      # (10 min in [s])
-            'max_detect_range': 300 / 1e3,  # (30 cm in [m])
-            'action': 'alarm',
+        'recruit': {
+            'decay_time': 33 / 5 * 60,      # (33 mins in [s])
+            'max_detect_range': 150 / 1e3,  # (15 cm in [m])
+            'action': 'attract',
+        },
+        'trail': {
+            'decay_time': 48 / 5 * 60 * 60,  # (48 hours in [s])
+            'max_detect_range': 0,
+            'action': 'attract',
         },
     }
