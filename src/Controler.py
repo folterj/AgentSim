@@ -4,9 +4,8 @@ from src.View import View
 
 class Controller:
     def __init__(self, model):
-        self.params = Params()
         self.model = model
-        self.view = View(self, model, self.params)
+        self.view = View(self, model)
         self.view.create()
 
     def start(self):
@@ -15,8 +14,8 @@ class Controller:
     def stop(self):
         self.model.stop()
 
-    def update_params(self):
-        self.model.update_params(self.params)
+    def update_timers(self):
+        self.model.update_timers()
 
     def reset(self):
         self.model.reset()

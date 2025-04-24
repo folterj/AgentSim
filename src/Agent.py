@@ -10,8 +10,9 @@ from src.util import calc_angle, smallest_angle_dif
 
 
 class Agent(DObject):
-    def __init__(self, position):
+    def __init__(self, position, params):
         super().__init__(position)
+        self.params = params
         self.angle = 0
         self.direction = np.array([0, 0])
         self.speed = 0
@@ -108,13 +109,13 @@ class Agent(DObject):
                         self.angle = target_angle
                         self.update_direction()
                     else:
-                        self.vary_direction(30)
+                        self.vary_direction(15)
                     self.distance_last_pheromone = 0
-                    new_pheromone = Pheromone('trail', self.position)
+                    new_pheromone = Pheromone('trail', self.position, self.params)
 
         elif self.mode == AgentMode.Distress:
             self.distance_last_pheromone = 0
-            new_pheromone = Pheromone('alarm', self.position)
+            new_pheromone = Pheromone('alarm', self.position, self.params)
 
         else:
             if has_target:
@@ -123,7 +124,7 @@ class Agent(DObject):
             self.distance_last_pheromone += distance_moved
             if self.distance_last_pheromone > Constants.trail_create_distance and not self.is_ignoring_pheromones():
                 self.distance_last_pheromone = 0
-                new_pheromone = Pheromone('trail', self.position)
+                new_pheromone = Pheromone('trail', self.position, self.params)
 
         return new_pheromone
 

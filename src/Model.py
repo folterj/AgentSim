@@ -1,5 +1,4 @@
 from datetime import datetime
-import math
 import numpy as np
 import random
 import time
@@ -7,12 +6,10 @@ from qtpy.QtCore import QTimer
 
 from src.Agent import Agent
 from src.AgentMode import AgentMode
-from src.Boundary import Boundary
 from src.Constants import Constants
 from src.DObject import DObject
 from src.Food import Food
 from src.Params import Params
-from src.Pheromone import Pheromone
 from src.util import *
 
 
@@ -25,29 +22,28 @@ class Model:
         self.hive = None
         self.agents = {}
         self.next_agent_id = 0
+        self.map = []
         self.pheromones = []
         self.pheromone_maps = {}
         self.foods = []
-        self.boundaries = []
-        self.params = Params()
+        self.params = None
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update)
-        self.update_timers()
         self.update_count = 0
         self.update_time = 0
         self.running = False
         self.update_running = False
         self.rnd = random.Random(int(datetime.now().timestamp()))
         self.reset()
+        self.update_timers()
 
     def reset(self):
         self.agents.clear()
         self.pheromones.clear()
         self.foods.clear()
-        self.boundaries.clear()
-        self.create_maze_map()
+        self.create_map()
         for label, values in Constants.pheromones.items():
-            self.pheromone_maps[label] = np.zeros((Constants.map_size, Constants.map_size), dtype=np.float32)
+            self.pheromone_maps[label] = np.zeros(np.flip(self.params.map_size), dtype=np.float32)
 
     def start(self):
         self.running = True
@@ -57,104 +53,28 @@ class Model:
         self.running = False
         self.update_timer.stop()
 
-    def update_params(self, params):
-        self.params.copy_from(params)
-        self.update_timers()
-
     def update_timers(self):
         self.update_timer.setInterval(int(Constants.update_time / self.params.time_speed * 1000))
 
-    def create_simple_map(self):
-        self.hive = DObject((0.5 * self.params.world_size[0], 0.25 * self.params.world_size[1]))
-        self.hive.detect_range = 100.0 / 1000  # (10 cm -> m)
-        self.foods.append(Food((0.5 * self.params.world_size[0], 0.75 * self.params.world_size[1]), 100))
-        points = [
-            (0.4, 0),
-            (0.4, 1),
-            (0.6, 1),
-            (0.6, 0),
-            (0.4, 0),
-        ]
-        self.add_boundary_path(points)
-
-    def create_maze_map(self):
-        self.hive = DObject((0.495 * self.params.world_size[0], 0.025 * self.params.world_size[1]))
+    def create_map(self):
+        image = load_image(Constants.map_filename)
+        self.params = Params(np.flip(image.shape[:2]))
+        if image.ndim < 3:
+            # gray source
+            self.map_image = cv.cvtColor(image, cv.COLOR_GRAY2BGRA)
+            self.map = (self.map_image > 0)
+        else:
+            # rgb source
+            self.map_image = cv.cvtColor(image, cv.COLOR_BGR2BGRA)
+            self.map = (cv.cvtColor(image, cv.COLOR_BGR2GRAY) > 0)
+        self.hive = DObject((0.5 * self.params.world_size[0], 0.025 * self.params.world_size[1]))
         self.hive.detect_range = 100.0 / 1000  # (10 cm)
-        self.foods.append(Food((0.495 * self.params.world_size[0], 0.975 * self.params.world_size[1]), 100))
-        points = [
-            (0.45 / 2 + 0.25, 0),
-            (0.45 / 2 + 0.25, 0.15),
-            (0.3 / 2 + 0.25, 0.22),
-            (0.07 / 2 + 0.25, 0.26),
-            (0.02 / 2 + 0.25, 0.3),
-            (0.07 / 2 + 0.25, 0.34),
-            (0.3 / 2 + 0.25, 0.37),
-            (0.45 / 2 + 0.25, 0.44),
-            (0.45 / 2 + 0.25, 0.56),
-            (0.32 / 2 + 0.25, 0.7),
-            (0.45 / 2 + 0.25, 0.85),
-            (0.45 / 2 + 0.25, 1),
-        ]
-        self.add_boundary_path(points)
-        points = [
-            (0.53 / 2 + 0.25, 0),
-            (0.53 / 2 + 0.25, 0.15),
-            (0.65 / 2 + 0.25, 0.3),
-            (0.53 / 2 + 0.25, 0.44),
-            (0.53 / 2 + 0.25, 0.56),
-            (0.66 / 2 + 0.25, 0.63),
-            (0.9 / 2 + 0.25, 0.66),
-            (0.96 / 2 + 0.25, 0.7),
-            (0.9 / 2 + 0.25, 0.74),
-            (0.67 / 2 + 0.25, 0.77),
-            (0.53 / 2 + 0.25, 0.85),
-            (0.53 / 2 + 0.25, 1),
-        ]
-        self.add_boundary_path(points)
-        points = [
-            (0.48 / 2 + 0.25, 0.19),
-            (0.36 / 2 + 0.25, 0.26),
-            (0.12 / 2 + 0.25, 0.3),
-            (0.36 / 2 + 0.25, 0.33),
-            (0.48 / 2 + 0.25, 0.39),
-            (0.57 / 2 + 0.25, 0.3),
-            (0.48 / 2 + 0.25, 0.19),
-        ]
-        self.add_boundary_path(points)
-        points = [
-            (0.5 / 2 + 0.25, 0.61),
-            (0.63 / 2 + 0.25, 0.68),
-            (0.86 / 2 + 0.25, 0.7),
-            (0.63 / 2 + 0.25, 0.73),
-            (0.5 / 2 + 0.25, 0.8),
-            (0.42 / 2 + 0.25, 0.7),
-            (0.5 / 2 + 0.25, 0.61),
-        ]
-        self.add_boundary_path(points)
-        points = [
-            (0.45 / 2 + 0.25, 0),
-            (0.53 / 2 + 0.25, 0),
-        ]
-        self.add_boundary_path(points)
-        points = [
-            (0.45 / 2 + 0.25, 1),
-            (0.53 / 2 + 0.25, 1),
-        ]
-        self.add_boundary_path(points)
-
-    def add_boundary_path(self, points):
-        last_point = None
-        for point in np.array(points):
-            if last_point is not None:
-                point1 = last_point * self.params.world_size
-                point2 = point * self.params.world_size
-                self.boundaries.append(Boundary(point1, point2))
-            last_point = point
+        self.foods.append(Food((0.5 * self.params.world_size[0], 0.975 * self.params.world_size[1]), 100))
 
     def spawn(self):
         if len(self.agents) < Constants.max_agents:
             position = self.hive.position
-            agent = Agent(position)
+            agent = Agent(position, self.params)
             agent.set_mode(AgentMode.Scout)
             self.agents[self.next_agent_id] = agent
             self.next_agent_id += 1
@@ -202,23 +122,20 @@ class Model:
                                 direction = (pheromone.position - agent.position) / distance
                                 new_direction = norm_direction(new_direction + direction)
                 destination = agent.calc_destination()
-                for boundary in self.boundaries:
-                    if boundary.intersects(agent.position):
-                        if boundary.get_side(agent.position) != boundary.get_side(destination):
-                            agent.ignore_pheromones()
-                            angle1 = boundary.angle
-                            angle2 = angle1 + 180
-                            dangle1 = smallest_angle_dif(agent.angle, angle1)
-                            dangle2 = smallest_angle_dif(agent.angle, angle2)
-                            if abs(dangle1) < abs(dangle2):
-                                agent.angle = angle1
-                            else:
-                                agent.angle = angle2
-                            agent.update_direction()
-                            destination = agent.calc_destination()
-                while not self.check_destination(agent.position, destination):
-                    agent.ignore_pheromones()
-                    agent.vary_direction(10)
+                if not self.map[self.params.world_to_map(destination, reverse=True)]:
+                    # check if destination is valid
+                    agent.update_direction()
+                    destination = agent.calc_destination()
+                # vary angle to find a valid destination
+                vary_angle = 0
+                while not self.check_destination(destination):
+                    if vary_angle < 0:
+                        vary_angle -= 5
+                    else:
+                        vary_angle += 5
+                    vary_angle = -vary_angle
+                    agent.angle += vary_angle
+                    agent.update_direction()
                     destination = agent.calc_destination()
                 new_pheromone = agent.update(new_direction)
                 if new_pheromone is not None:
@@ -245,25 +162,20 @@ class Model:
     def find_pheromones_pos(self, agent):
         pheromones = []
         for pheromone in self.pheromones:
-            if pheromone.calc_distance(agent.position) < pheromone.max_detect_range + 1 / Constants.map_size:
+            if pheromone.calc_distance(agent.position) < pheromone.max_detect_range + 1:
                 pheromones.append(pheromone)
         return pheromones
 
     def find_pheromones_map(self, agent):
         pheromones = []
-        position = world_to_map(agent.position)
+        position = self.params.world_to_map(agent.position)
         for label, map in self.pheromone_maps.items():
             if map[tuple(np.flip(position))]:
                 pheromones.append(label)
         return pheromones
 
-    def check_destination(self, position, destination):
-        for boundary in self.boundaries:
-            # optimise
-            if boundary.intersects(position):
-                if boundary.get_side(position) != boundary.get_side(destination):
-                    return False
-        return True
+    def check_destination(self, destination):
+        return self.map[self.params.world_to_map(destination, reverse=True)]
 
     def update_observers(self):
         for observer in self.observers:

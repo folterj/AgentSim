@@ -3,13 +3,13 @@ import numpy as np
 
 from src.Constants import Constants
 from src.DObject import DObject
-from src.util import world_to_map
 
 
 class Pheromone(DObject):
-    def __init__(self, label, position):
+    def __init__(self, label, position, params):
         super().__init__(position)
         self.label = label
+        self.params = params
         self.decay_time = 0
         self.max_detect_range = 0
         self.age = 0
@@ -35,11 +35,12 @@ class Pheromone(DObject):
             detect_range = int(round(self.detect_range))
             for y in range(-detect_range, detect_range):
                 for x in range(-detect_range, detect_range):
-                    position = np.flip(np.array(world_to_map(position0)) + [x, y])
+                    position = np.flip(np.array(self.params.world_to_map(position0)) + [x, y])
                     if 0 <= position[0] < map[0] and 0 <= position[1] < map[1]:
                         map[tuple(position)] = self.activity
         else:
-            map[world_to_map(position0)] = self.activity
+            position = self.params.world_to_map(position0, reverse=True)
+            map[position] = self.activity
 
     def update(self, dage, map):
         self.age += dage

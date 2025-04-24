@@ -17,9 +17,9 @@ class MainWindow(QMainWindow):
         self.spinBox_time_speed.valueChanged.connect(self.update_time_speed)
 
     def controller_start(self):
-        self.controller.update_params()
+        self.controller.update_timers()
         self.controller.start()
 
     def update_time_speed(self):
         self.controller.params.time_speed = self.spinBox_time_speed.value()
-        self.controller.update_params()
+        self.controller.update_timers()
