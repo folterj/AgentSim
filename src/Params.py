@@ -4,10 +4,12 @@ from src.Constants import Constants
 
 
 class Params:
-	def __init__(self, map_size):
+	def __init__(self):
+		self.time_speed = 1
+
+	def set_map_size(self, map_size):
 		self.map_size = map_size
 		self.world_size = np.array(Constants.world_size) * map_size / (max(map_size), max(map_size))
-		self.time_speed = 1
 
 	def world_to_map(self, position, reverse=False):
 		position = np.array(position)

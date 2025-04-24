@@ -1,11 +1,12 @@
-from src.Params import Params
+from src.Model import Model
 from src.View import View
 
 
 class Controller:
-    def __init__(self, model):
-        self.model = model
-        self.view = View(self, model)
+    def __init__(self):
+        self.model = Model()
+        self.view = View(self, self.model)
+        self.model.init()
         self.view.create()
 
     def start(self):

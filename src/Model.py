@@ -26,7 +26,7 @@ class Model:
         self.pheromones = []
         self.pheromone_maps = {}
         self.foods = []
-        self.params = None
+        self.params = Params()
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update)
         self.update_count = 0
@@ -34,6 +34,8 @@ class Model:
         self.running = False
         self.update_running = False
         self.rnd = random.Random(int(datetime.now().timestamp()))
+
+    def init(self):
         self.reset()
         self.update_timers()
 
@@ -41,7 +43,8 @@ class Model:
         self.agents.clear()
         self.pheromones.clear()
         self.foods.clear()
-        self.create_map()
+        self.map_image = self.create_map()
+        self.set_observer_map_image(self.map_image)
         for label, values in Constants.pheromones.items():
             self.pheromone_maps[label] = np.zeros(np.flip(self.params.map_size), dtype=np.float32)
 
@@ -58,18 +61,19 @@ class Model:
 
     def create_map(self):
         image = load_image(Constants.map_filename)
-        self.params = Params(np.flip(image.shape[:2]))
+        self.params.set_map_size(np.flip(image.shape[:2]))
         if image.ndim < 3:
             # gray source
-            self.map_image = cv.cvtColor(image, cv.COLOR_GRAY2BGRA)
-            self.map = (self.map_image > 0)
+            map_image = cv.cvtColor(image, cv.COLOR_GRAY2BGRA)
+            self.map = (map_image > 0)
         else:
             # rgb source
-            self.map_image = cv.cvtColor(image, cv.COLOR_BGR2BGRA)
+            map_image = cv.cvtColor(image, cv.COLOR_BGR2BGRA)
             self.map = (cv.cvtColor(image, cv.COLOR_BGR2GRAY) > 0)
         self.hive = DObject((0.5 * self.params.world_size[0], 0.025 * self.params.world_size[1]))
         self.hive.detect_range = 100.0 / 1000  # (10 cm)
         self.foods.append(Food((0.5 * self.params.world_size[0], 0.975 * self.params.world_size[1]), 100))
+        return map_image
 
     def spawn(self):
         if len(self.agents) < Constants.max_agents:
@@ -150,6 +154,15 @@ class Model:
                 if not pheromone.active:
                     self.pheromones.remove(pheromone)
 
+            # TODO: improve performance
+            map_image = self.map_image / np.float32(255)
+            weight = 1 / len(self.pheromone_maps)
+            for pheromone_map in self.pheromone_maps.values():
+                color = np.array([1, 0, 0, 1])
+                map_image -= np.atleast_3d(pheromone_map * weight) * (1 - color)
+            map_image = (map_image * 255).astype(np.uint8)
+            self.set_observer_map_image(map_image)
+
             self.update_count += 1
             self.update_time = time.time() - start_time
             self.update_running = False
@@ -180,6 +193,10 @@ class Model:
     def update_observers(self):
         for observer in self.observers:
             observer.update()
+
+    def set_observer_map_image(self, image):
+        for observer in self.observers:
+            observer.set_map_image(image)
 
     def register_observer(self, observer):
         self.observers.append(observer)

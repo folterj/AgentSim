@@ -56,8 +56,8 @@ class View:
 
             self.stopwatch = time.time()
 
-            self.canvas = self.model.map_image.copy()
-            self.draw_pheromones()
+            self.canvas = self.map_image.copy()
+            #self.draw_pheromones()
             self.draw_hive()
             self.draw_foods()
             self.draw_agents()
@@ -75,7 +75,10 @@ class View:
         self.screen_size = new_size
         self.update()
 
-    # this function is called by the model to update observer
+    # functions called by the model to update observer
+    def set_map_image(self, map_image):
+        self.map_image = map_image
+
     # remove QTimer in view/controller, and handle calling Qt function from here
     def update(self):
         self.draw()
