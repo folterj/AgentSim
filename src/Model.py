@@ -45,6 +45,7 @@ class Model:
         self.foods.clear()
         self.map_image = self.create_map()
         self.set_observer_map_image(self.map_image)
+        self.map_image_float = self.map_image / np.float32(255)
         for label, values in Constants.pheromones.items():
             self.pheromone_maps[label] = np.zeros(np.flip(self.params.map_size), dtype=np.float32)
 
@@ -154,12 +155,12 @@ class Model:
                 if not pheromone.active:
                     self.pheromones.remove(pheromone)
 
-            # TODO: improve performance
-            map_image = self.map_image / np.float32(255)
+            # TODO: improve performance - maybe use opencv? no alpha channel?
+            map_image = self.map_image_float.copy()
             weight = 1 / len(self.pheromone_maps)
             for pheromone_map in self.pheromone_maps.values():
                 color = np.array([1, 0, 0, 1])
-                map_image -= np.atleast_3d(pheromone_map * weight) * (1 - color)
+                map_image[self.map] -= np.atleast_3d(pheromone_map)[self.map] * (weight * (1 - color))
             map_image = (map_image * 255).astype(np.uint8)
             self.set_observer_map_image(map_image)
 
