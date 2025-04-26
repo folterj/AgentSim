@@ -171,6 +171,9 @@ class Model:
 
     def add_pheromone(self, pheromone):
         self.pheromones.append(pheromone)
+        # TODO: strategy:
+        #  1. add pheromones to map, recreating map every n time
+        #  2. add pheromones to map w/o recreating, only subtract change (delta activity)
         pheromone.add_to_map(self.pheromone_maps[pheromone.label])
 
     def find_pheromones_pos(self, agent):

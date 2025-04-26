@@ -1,3 +1,4 @@
+import cv2 as cv
 import math
 import numpy as np
 
@@ -15,7 +16,6 @@ class Pheromone(DObject):
         self.age = 0
         self.active = True
         self.activity = 1
-        self.detect_range = self.max_detect_range
 
         self.set_values()
         self.detect_range = self.max_detect_range
@@ -30,17 +30,16 @@ class Pheromone(DObject):
         self.action = values['action']
 
     def add_to_map(self, map):
-        position0 = self.position
+        # increment map value
         if self.detect_range > 0:
-            detect_range = int(round(self.detect_range))
-            for y in range(-detect_range, detect_range):
-                for x in range(-detect_range, detect_range):
-                    position = np.flip(np.array(self.params.world_to_map(position0)) + [x, y])
-                    if 0 <= position[0] < map[0] and 0 <= position[1] < map[1]:
-                        map[tuple(position)] = self.activity
+            position = self.params.world_to_map(self.position)
+            rad = self.params.world_to_map(self.detect_range)
+            value = self.activity
+            # TODO: increment instead of set (using addWeighted?):
+            cv.circle(map, position, rad, value, cv.FILLED)
         else:
-            position = self.params.world_to_map(position0, reverse=True)
-            map[position] = self.activity
+            position = self.params.world_to_map(self.position, reverse=True)
+            map[position] += self.activity
 
     def update(self, dage, map):
         self.age += dage
