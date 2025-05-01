@@ -44,7 +44,6 @@ class Model:
         self.pheromones.clear()
         self.foods.clear()
         self.map_image = self.create_map()
-        self.set_observer_map_image(self.map_image)
         self.map_image_float = self.map_image / np.float32(255)
         for label, values in Constants.pheromones.items():
             self.pheromone_maps[label] = np.zeros(np.flip(self.params.map_size), dtype=np.float32)
@@ -149,20 +148,10 @@ class Model:
             for food in self.foods:
                 if food.current_amount <= 0:
                     self.foods.remove(food)
-            for pheromone in self.pheromones:
-                map = self.pheromone_maps[pheromone.label]
-                pheromone.update(Constants.update_time, map)
+            for pheromone in self.pheromones.copy():
+                pheromone.update(Constants.update_time, self.pheromone_maps[pheromone.label])
                 if not pheromone.active:
                     self.pheromones.remove(pheromone)
-
-            # TODO: improve performance - maybe use opencv? no alpha channel?
-            map_image = self.map_image_float.copy()
-            weight = 1 / len(self.pheromone_maps)
-            for pheromone_map in self.pheromone_maps.values():
-                color = np.array([1, 0, 0, 1])
-                map_image[self.map] -= np.atleast_3d(pheromone_map)[self.map] * (weight * (1 - color))
-            map_image = (map_image * 255).astype(np.uint8)
-            self.set_observer_map_image(map_image)
 
             self.update_count += 1
             self.update_time = time.time() - start_time
@@ -170,11 +159,11 @@ class Model:
             self.update_observers()
 
     def add_pheromone(self, pheromone):
-        self.pheromones.append(pheromone)
         # TODO: strategy:
-        #  1. add pheromones to map, recreating map every n time
-        #  2. add pheromones to map w/o recreating, only subtract change (delta activity)
-        pheromone.add_to_map(self.pheromone_maps[pheromone.label])
+        #    1. add pheromones to map, recreating map every n time
+        #  * 2. add pheromones to map w/o recreating, only subtract change (delta activity)
+        self.pheromones.append(pheromone)
+        pheromone.update_map(self.pheromone_maps[pheromone.label], pheromone.activity)
 
     def find_pheromones_pos(self, agent):
         pheromones = []
@@ -197,10 +186,6 @@ class Model:
     def update_observers(self):
         for observer in self.observers:
             observer.update()
-
-    def set_observer_map_image(self, image):
-        for observer in self.observers:
-            observer.set_map_image(image)
 
     def register_observer(self, observer):
         self.observers.append(observer)

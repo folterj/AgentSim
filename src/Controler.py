@@ -15,6 +15,9 @@ class Controller:
     def stop(self):
         self.model.stop()
 
+    def set_time_speed(self, time_speed):
+        self.model.params.time_speed = time_speed
+
     def update_timers(self):
         self.model.update_timers()
 

@@ -16,6 +16,7 @@ class Pheromone(DObject):
         self.age = 0
         self.active = True
         self.activity = 1
+        self.last_set_activity = 0
 
         self.set_values()
         self.detect_range = self.max_detect_range
@@ -29,20 +30,23 @@ class Pheromone(DObject):
         self.max_detect_range = values['max_detect_range']
         self.action = values['action']
 
-    def add_to_map(self, map):
-        # increment map value
-        if self.detect_range > 0:
-            position = self.params.world_to_map(self.position)
-            rad = self.params.world_to_map(self.detect_range)
-            value = self.activity
-            # TODO: increment instead of set (using addWeighted?):
-            cv.circle(map, position, rad, value, cv.FILLED)
-        else:
-            position = self.params.world_to_map(self.position, reverse=True)
-            map[position] += self.activity
-
     def update(self, dage, map):
         self.age += dage
         self.activity = math.exp(-self.age / self.decay_time)
         self.detect_range = self.max_detect_range * self.activity
         self.active = self.age < 5 * self.decay_time  # 5 * Tau
+        dactivity = self.activity - self.last_set_activity
+        if abs(dactivity) > 0.01:
+            self.update_map(map, dactivity)
+
+    def update_map(self, map, dactivity):
+        if self.detect_range > 0:
+            position = self.params.world_to_map(self.position)
+            rad = self.params.world_to_map(self.detect_range)
+            mask = np.zeros_like(map)
+            cv.circle(mask, position, rad, dactivity, cv.FILLED)
+            map += mask
+        else:
+            position = self.params.world_to_map(self.position, reverse=True)
+            map[position] += dactivity
+        self.last_set_activity = self.activity

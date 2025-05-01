@@ -56,7 +56,13 @@ class View:
 
             self.stopwatch = time.time()
 
-            self.canvas = self.map_image.copy()
+            # TODO: improve performance - maybe use opencv? no alpha channel?
+            map_image = self.model.map_image_float.copy()
+            weight = 1 / len(self.model.pheromone_maps)
+            for pheromone_map in self.model.pheromone_maps.values():
+                color = np.array([1, 0, 0, 1])
+                map_image[self.model.map] -= np.atleast_3d(pheromone_map)[self.model.map] * (weight * (1 - color))
+            self.canvas = (map_image * 255).astype(np.uint8)
             #self.draw_pheromones()
             self.draw_hive()
             self.draw_foods()
@@ -74,10 +80,6 @@ class View:
     def update_size(self, new_size):
         self.screen_size = new_size
         self.update()
-
-    # functions called by the model to update observer
-    def set_map_image(self, map_image):
-        self.map_image = map_image
 
     # remove QTimer in view/controller, and handle calling Qt function from here
     def update(self):
