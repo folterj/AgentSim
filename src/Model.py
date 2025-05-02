@@ -2,7 +2,7 @@ from datetime import datetime
 import numpy as np
 import random
 import time
-from qtpy.QtCore import QTimer
+from qtpy.QtCore import QTimer, QThread
 
 from src.Agent import Agent
 from src.AgentMode import AgentMode
@@ -185,7 +185,11 @@ class Model:
 
     def update_observers(self):
         for observer in self.observers:
-            observer.update()
+            if isinstance(observer, QThread):
+                if not observer.updating:
+                    observer.start()
+            else:
+                observer.update()
 
     def register_observer(self, observer):
         self.observers.append(observer)

@@ -1,14 +1,18 @@
 import cv2 as cv
 import numpy as np
 import time
+from qtpy.QtCore import QThread
 
 from src.Constants import Constants
 from src.ImageWindow import ImageWindow
 from src.MainWindow import MainWindow
 
 
-class View:
+# remove QTimer in view/controller, and handle calling Qt function from here?
+
+class View(QThread):
     def __init__(self, controller, model):
+        super().__init__()
         self.controller = controller
         self.model = model
         self.params = model.params
@@ -21,6 +25,12 @@ class View:
         self.update_time = 0
 
         model.register_observer(self)
+
+    def update(self):
+        self.draw()
+
+    def run(self):
+        self.draw()
 
     def create(self):
         self.image_window = ImageWindow(self.controller)
@@ -80,10 +90,6 @@ class View:
     def update_size(self, new_size):
         self.screen_size = new_size
         self.update()
-
-    # remove QTimer in view/controller, and handle calling Qt function from here
-    def update(self):
-        self.draw()
 
     def draw_agents(self, color=(0, 0, 0)):
         rad = max(self.params.world_to_map(Constants.agent_size) // 2, 1)
