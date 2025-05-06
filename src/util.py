@@ -11,8 +11,11 @@ def load_image(filename):
     return image
 
 
-def calc_angle(origin, target):
-    delta = target - origin
+def calc_angle(origin, target=None):
+    if target is not None:
+        delta = target - origin
+    else:
+        delta = origin
     return math.degrees(math.atan2(delta[1], delta[0]))
 
 

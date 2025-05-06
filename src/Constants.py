@@ -1,6 +1,6 @@
 class Constants:
     map_filename = 'maps/simple_maze.png'
-    world_size = 250e-3  # 25 cm (250 mm)
+    world_size = 2.5  # 25 cm (250 mm)
     update_time = 0.1  # (0.1 s)
     spawn_time = 1  # (1 s)
     refresh_time = 0.1  # (10 Hz)
@@ -16,7 +16,7 @@ class Constants:
     total_energy = 50  # (50 m)
     trail_energy = 10  # (10 m)
     trail_create_distance = agent_size  # (body length)
-    recruit_create_distance = 0  # (continuous)
+    recruit_create_distance = agent_size    #0  # (continuous)
 
     pheromones = {
         'alarm': {
@@ -36,7 +36,7 @@ class Constants:
         },
         'trail': {
             'decay_time': 48 / 5 * 60 * 60,  # (48 hours in [s])
-            'max_detect_range': 0,
+            'max_detect_range': agent_size / 2,
             'action': 'attract',
         },
     }

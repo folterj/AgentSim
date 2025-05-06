@@ -10,6 +10,7 @@ from src.Constants import Constants
 from src.DObject import DObject
 from src.Food import Food
 from src.Params import Params
+from src.Pheromone import Pheromone
 from src.util import *
 
 
@@ -90,7 +91,7 @@ class Model:
             if self.update_count > Constants.spawn_time / Constants.update_time:
                 self.spawn()
                 self.update_count = 0
-            for agent in self.agents.values():
+            for agent in self.agents.copy().values():
                 new_direction = (0, 0)
                 dest_found = False
                 if agent.mode in [AgentMode.Return, AgentMode.Recruit]:
@@ -108,16 +109,21 @@ class Model:
                     for food in self.foods:
                         distance = food.calc_distance(agent.position)
                         if distance < food.detect_range:
-                            if distance <= agent.get_move_distance():
-                                agent.position = food.position
-                                food.eat_amount(agent)
+                            if distance <= Constants.agent_size:
+                                agent.set_mode(AgentMode.Eat)
+                                finished = food.eat_amount(agent)
+                                if finished:
+                                    agent.set_mode(AgentMode.Recruit)
                             else:
                                 agent.angle = calc_angle(agent.position, food.position)
                                 agent.update_direction()
                             dest_found = True
                             break
+                elif agent.mode == AgentMode.Eat:
+                    agent.set_mode(AgentMode.Recruit)
                 if not dest_found and not agent.is_ignoring_pheromones():
-                    pheromones = self.find_pheromones_pos(agent)
+                    #pheromones = self.find_pheromones_pos(agent)
+                    pheromones = self.find_pheromones_map(agent)
                     if pheromones:
                         pheromone = agent.choose_pheromone(pheromones)
                         if pheromone:
@@ -126,24 +132,28 @@ class Model:
                                 direction = (pheromone.position - agent.position) / distance
                                 new_direction = norm_direction(new_direction + direction)
                 destination = agent.calc_destination()
-                if not self.map[self.params.world_to_map(destination, reverse=True)]:
+                if self.check_destination(destination):
                     # check if destination is valid
                     agent.update_direction()
                     destination = agent.calc_destination()
-                # vary angle to find a valid destination
-                vary_angle = 0
-                while not self.check_destination(destination):
-                    if vary_angle < 0:
-                        vary_angle -= 5
-                    else:
-                        vary_angle += 5
-                    vary_angle = -vary_angle
-                    agent.angle += vary_angle
-                    agent.update_direction()
-                    destination = agent.calc_destination()
-                new_pheromone = agent.update(new_direction)
-                if new_pheromone is not None:
-                    self.add_pheromone(new_pheromone)
+
+                if agent.speed > 0:
+                    # vary angle to find a valid destination
+                    vary_angle = 0
+                    attempts = 0
+                    while not self.check_destination(destination) and attempts < 72:
+                        if vary_angle < 0:
+                            vary_angle -= 5
+                        else:
+                            vary_angle += 5
+                        vary_angle = -vary_angle
+                        agent.angle += vary_angle
+                        agent.update_direction()
+                        destination = agent.calc_destination()
+                        attempts += 1
+                    new_pheromone = agent.update(new_direction)
+                    if new_pheromone is not None:
+                        self.add_pheromone(new_pheromone)
 
             for food in self.foods:
                 if food.current_amount <= 0:
@@ -166,22 +176,27 @@ class Model:
         pheromone.update_map(self.pheromone_maps[pheromone.label], pheromone.activity)
 
     def find_pheromones_pos(self, agent):
+        detect_range_offset = np.mean(self.params.map_to_world(1))
         pheromones = []
         for pheromone in self.pheromones:
-            if pheromone.calc_distance(agent.position) < pheromone.max_detect_range + 1:
+            if pheromone.calc_distance(agent.position) <= pheromone.max_detect_range + detect_range_offset:
                 pheromones.append(pheromone)
         return pheromones
 
     def find_pheromones_map(self, agent):
         pheromones = []
-        position = self.params.world_to_map(agent.position)
-        for label, map in self.pheromone_maps.items():
-            if map[tuple(np.flip(position))]:
-                pheromones.append(label)
+        tested_positions = []
+        for position in agent.get_sample_positions():
+            map_position = self.params.world_to_map(position, reverse=True)
+            if map_position not in tested_positions:
+                tested_positions.append(map_position)
+                for label, map in self.pheromone_maps.items():
+                    if map[map_position]:
+                        pheromones.append(Pheromone(label, position, self.params))
         return pheromones
 
     def check_destination(self, destination):
-        return self.map[self.params.world_to_map(destination, reverse=True)]
+        return destination is not None and self.map[self.params.world_to_map(destination, reverse=True)]
 
     def update_observers(self):
         for observer in self.observers:

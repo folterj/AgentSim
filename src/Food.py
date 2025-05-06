@@ -10,7 +10,7 @@ class Food(DObject):
         if position:
             self.position = position
 
-    def eat_amount(self, ant):
+    def eat_amount(self, agent):
         damount = 0.01
         finished = False
 
@@ -19,19 +19,15 @@ class Food(DObject):
             damount = self.current_amount
             finished = True
 
-        if ant.food_amount + damount >= 1:
+        if agent.food_amount + damount >= 1:
             # don't over eat
-            damount = 1 - ant.food_amount
+            damount = 1 - agent.food_amount
             finished = True
 
         self.current_amount -= damount
-        ant.food_amount += damount
+        agent.food_amount += damount
 
-        if finished:
-            ant.turn_around()
-            ant.set_mode('ReturningFood')
-        else:
-            ant.set_mode('Eating')
+        return finished
 
     def get_food_left(self):
         return self.current_amount / self.food_amount

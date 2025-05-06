@@ -71,7 +71,7 @@ class View(QThread):
             weight = 1 / len(self.model.pheromone_maps)
             for pheromone_map in self.model.pheromone_maps.values():
                 color = np.array([1, 0, 0, 1])
-                map_image[self.model.map] -= np.atleast_3d(pheromone_map)[self.model.map] * (weight * (1 - color))
+                map_image[self.model.map] -= np.clip(np.atleast_3d(pheromone_map)[self.model.map], 0, 1) * (weight * (1 - color))
             self.canvas = (map_image * 255).astype(np.uint8)
             #self.draw_pheromones()
             self.draw_hive()
@@ -93,21 +93,21 @@ class View(QThread):
 
     def draw_agents(self, color=(0, 0, 0)):
         rad = max(self.params.world_to_map(Constants.agent_size) // 2, 1)
-        for agent_id, agent in self.model.agents.items():
+        for agent_id, agent in self.model.agents.copy().items():
             position = self.params.world_to_map(agent.position)
             color1 = list(int(c * 255) for c in list(color) + [1])
             cv.circle(self.canvas, position, rad, color1, cv.FILLED, cv.LINE_AA)
 
     def draw_pheromones(self, color=(1, 0, 0)):
         rad = max(self.params.world_to_map(Constants.pheromone_size) // 2, 1)
-        for pheromone in self.model.pheromones:
+        for pheromone in self.model.pheromones.copy():
             position = self.params.world_to_map(pheromone.position)
             color1 = list(int(c * 255) for c in color) + [int(pheromone.activity * 255)]
             cv.circle(self.canvas, position, rad, color1, cv.FILLED, cv.LINE_AA)
 
     def draw_foods(self, color=(0, 1, 0)):
         rad = max(self.params.world_to_map(Constants.food_size) // 2, 1)
-        for food in self.model.foods:
+        for food in self.model.foods.copy():
             position = self.params.world_to_map(food.position)
             color1 = list(int(c * 255) for c in color) + [int(food.get_food_left() * 255)]
             cv.circle(self.canvas, position, rad, color1, cv.FILLED, cv.LINE_AA)
