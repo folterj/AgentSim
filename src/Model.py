@@ -18,6 +18,9 @@ from src.util import *
 
 
 class Model:
+    sample_angles = [0, 15, -15, 30, -30, 45, -45, 60, -60]
+    sample_weights = [1, 0.75, 0.75, 0.5, 0.5, 0.25, 0.25, 0.1, 0.1]
+
     def __init__(self):
         self.observers = []
         self.hive = None
@@ -123,14 +126,14 @@ class Model:
                     agent.set_mode(AgentMode.Recruit)
                 if not dest_found and not agent.is_ignoring_pheromones():
                     #pheromones = self.find_pheromones_pos(agent)
-                    pheromones = self.find_pheromones_map(agent)
-                    if pheromones:
-                        pheromone = agent.choose_pheromone(pheromones)
-                        if pheromone:
-                            distance = pheromone.calc_distance(agent.position)
-                            if distance > 0:
-                                direction = (pheromone.position - agent.position) / distance
-                                new_direction = norm_direction(new_direction + direction)
+                    #if pheromones:
+                    #    pheromone = agent.choose_pheromone(pheromones)
+                    pheromone = self.find_pheromone_map(agent)
+                    if pheromone:
+                        distance = pheromone.calc_distance(agent.position)
+                        if distance > 0:
+                            direction = (pheromone.position - agent.position) / distance
+                            new_direction = norm_direction(new_direction + direction)
                 destination = agent.calc_destination()
                 if self.check_destination(destination):
                     # check if destination is valid
@@ -183,17 +186,30 @@ class Model:
                 pheromones.append(pheromone)
         return pheromones
 
-    def find_pheromones_map(self, agent):
-        pheromones = []
-        tested_positions = []
-        for position in agent.get_sample_positions():
-            map_position = self.params.world_to_map(position, reverse=True)
-            if map_position not in tested_positions:
-                tested_positions.append(map_position)
-                for label, map in self.pheromone_maps.items():
-                    if map[map_position]:
-                        pheromones.append(Pheromone(label, position, self.params))
-        return pheromones
+    def find_pheromone_map(self, agent):
+        # TODO: pre-sort/group on:
+        #   1. pheromone type
+        #   2. angle
+        #   3. pheromone activity
+        #   or 2 (weight list) * 3
+        #   use np.argsort(2 * w * 3)
+        mag = max(agent.get_move_distance(), Constants.agent_size, np.mean(self.params.map_to_world(2)))
+        positions = []
+        map_positions = []
+        for sample_angle in self.sample_angles:
+            angle = agent.angle + sample_angle
+            position = np.array([math.cos(math.radians(angle)), math.sin(math.radians(angle))]) * mag + agent.position
+            positions.append(position)
+            map_positions.append(self.params.world_to_map(position, reverse=True))
+        indices = np.transpose(map_positions)
+        indices = (indices[0], indices[1])
+        for label, map in self.pheromone_maps.items():
+            if agent.mode == AgentMode.Scout and not label == 'trail':
+                values = map[indices]
+                if np.any(values > 0):
+                    index = np.argmax(values * self.sample_weights)
+                    return Pheromone(label, positions[index], self.params)
+        return None
 
     def check_destination(self, destination):
         return destination is not None and self.map[self.params.world_to_map(destination, reverse=True)]

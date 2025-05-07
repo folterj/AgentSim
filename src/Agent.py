@@ -49,15 +49,6 @@ class Agent(DObject):
             destination = self.position + (new_direction * distance_moved)
         return destination
 
-    def get_sample_positions(self):
-        positions = []
-        for dangle in [0, 15, -15, 30, -30, 45, -45, 60, -60]:
-            angle = self.angle + dangle
-            direction = np.array([math.cos(math.radians(angle)), math.sin(math.radians(angle))])
-            position = self.position + (direction * Constants.agent_size / 2)
-            positions.append(position)
-        return positions
-
     def set_mode(self, mode):
         if mode == self.mode:
             return
@@ -121,7 +112,7 @@ class Agent(DObject):
                     self.angle = calc_angle(target_direction)
                     self.update_direction()
                 else:
-                    self.vary_direction(5)
+                    self.vary_direction(1)
                 self.distance_last_pheromone = 0
                 new_pheromone = Pheromone('trail', self.position, self.params)
 
