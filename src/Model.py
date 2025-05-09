@@ -47,10 +47,10 @@ class Model:
         self.agents.clear()
         self.pheromones.clear()
         self.foods.clear()
-        self.map_image = self.create_map()
+        self.map, self.map_image = self.create_map()
         self.map_image_float = self.map_image / np.float32(255)
         for label, values in Constants.pheromones.items():
-            self.pheromone_maps[label] = np.zeros(np.flip(self.params.map_size), dtype=np.float32)
+            self.pheromone_maps[label] = np.zeros_like(self.map, dtype=np.float32)
 
     def start(self):
         self.running = True
@@ -65,19 +65,22 @@ class Model:
 
     def create_map(self):
         image = load_image(Constants.map_filename)
-        self.params.set_map_size(np.flip(image.shape[:2]))
+        map_size = self.params.world_to_map(Constants.world_size)
+        scale = map_size / max(image.shape[:2])
+        image = cv.resize(image, None, fx=scale, fy=scale)
         if image.ndim < 3:
             # gray source
             map_image = cv.cvtColor(image, cv.COLOR_GRAY2BGRA)
-            self.map = (map_image > 0)
+            map = (map_image > 0)
         else:
             # rgb source
             map_image = cv.cvtColor(image, cv.COLOR_BGR2BGRA)
-            self.map = (cv.cvtColor(image, cv.COLOR_BGR2GRAY) > 0)
-        self.hive = DObject((0.5 * self.params.world_size[0], 0.025 * self.params.world_size[1]))
+            map = (cv.cvtColor(image, cv.COLOR_BGR2GRAY) > 0)
+        world_size = self.params.map_to_world(map.shape, reverse=True)
+        self.hive = DObject((0.5 * world_size[0], 0.025 * world_size[1]))
         self.hive.detect_range = 100.0 / 1000  # (10 cm)
-        self.foods.append(Food((0.5 * self.params.world_size[0], 0.975 * self.params.world_size[1]), 100))
-        return map_image
+        self.foods.append(Food((0.5 * world_size[0], 0.975 * world_size[1]), 100))
+        return map, map_image
 
     def spawn(self):
         if len(self.agents) < Constants.max_agents:
@@ -94,7 +97,7 @@ class Model:
             if self.update_count > Constants.spawn_time / Constants.update_time:
                 self.spawn()
                 self.update_count = 0
-            for agent in self.agents.copy().values():
+            for agent_key, agent in self.agents.copy().items():
                 new_direction = (0, 0)
                 dest_found = False
                 if agent.mode in [AgentMode.Return, AgentMode.Recruit]:
@@ -102,7 +105,7 @@ class Model:
                     distance = self.hive.calc_distance(agent.position)
                     if distance < self.hive.detect_range:
                         if distance <= agent.get_move_distance():
-                            self.agents.pop(agent)
+                            self.agents.pop(agent_key)
                             continue
                         agent.angle = calc_angle(agent.position, self.hive.position)
                         agent.update_direction()
@@ -142,18 +145,27 @@ class Model:
 
                 if agent.speed > 0:
                     # vary angle to find a valid destination
-                    vary_angle = 0
-                    attempts = 0
-                    while not self.check_destination(destination) and attempts < 72:
-                        if vary_angle < 0:
-                            vary_angle -= 5
-                        else:
-                            vary_angle += 5
-                        vary_angle = -vary_angle
-                        agent.angle += vary_angle
-                        agent.update_direction()
-                        destination = agent.calc_destination()
-                        attempts += 1
+                    if not self.check_destination(destination):
+                        vary_angle = 0
+                        attempts = 0
+                        map_position = self.params.world_to_map(agent.position)
+                        while (not self.check_destination(destination)
+                               and self.params.world_to_map(agent.position) == map_position
+                               and attempts < 72):
+                            if vary_angle < 0:
+                                vary_angle -= 5
+                            else:
+                                vary_angle += 5
+                            vary_angle = -vary_angle
+                            agent.angle += vary_angle
+                            agent.update_direction()
+                            destination = agent.calc_destination()
+                            attempts += 1
+
+                        if attempts >= 72:
+                            # no solution found with different position
+                            agent.speed = 0
+
                     new_pheromone = agent.update(new_direction)
                     if new_pheromone is not None:
                         self.add_pheromone(new_pheromone)

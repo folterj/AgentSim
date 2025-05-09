@@ -45,8 +45,7 @@ class Agent(DObject):
         if new_direction is None:
             new_direction = np.array(self.direction)
         if self.mode not in [AgentMode.Idle, AgentMode.Eat, AgentMode.Dead]:
-            distance_moved = self.speed * Constants.update_time
-            destination = self.position + (new_direction * distance_moved)
+            destination = self.position + (new_direction * self.get_move_distance())
         return destination
 
     def set_mode(self, mode):
@@ -67,6 +66,7 @@ class Agent(DObject):
             self.speed = Constants.alarm_speed
         self.mode = mode
 
+    # unused
     def choose_pheromone(self, pheromones):
         candidates = []
         trajectory_angle = calc_angle(self.trajectory)
@@ -112,8 +112,7 @@ class Agent(DObject):
                     self.angle = calc_angle(target_direction)
                     self.update_direction()
                 else:
-                    self.vary_direction(1)
-                self.distance_last_pheromone = 0
+                    self.vary_direction(5)
                 new_pheromone = Pheromone('trail', self.position, self.params)
 
         elif self.mode == AgentMode.Distress:
@@ -126,15 +125,14 @@ class Agent(DObject):
             if has_target:
                 self.direction = np.array(target_direction)
                 self.update_angle()
-            if self.distance_last_pheromone > Constants.trail_create_distance and not self.is_ignoring_pheromones():
-                new_pheromone = Pheromone('trail', self.position, self.params)
 
+        self.distance_last_pheromone += distance_moved
         if new_pheromone is not None:
-            if self.distance_last_pheromone > new_pheromone.detect_range and not self.is_ignoring_pheromones():
+            if self.distance_last_pheromone > new_pheromone.max_detect_range and not self.is_ignoring_pheromones():
                 self.distance_last_pheromone = 0
-            else:
-                self.distance_last_pheromone += distance_moved
-        return new_pheromone
+                return new_pheromone
+
+        return None
 
     def ignore_pheromones(self):
         self.ignore_pheromone_steps = 5
